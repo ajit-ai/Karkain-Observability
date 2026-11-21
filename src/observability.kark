@@ -1,0 +1,97 @@
+// Karkain-Observability - logs, metrics and trace diagnostics.
+// Karkain Language v1.2.0 verified baseline (tag v1.2.0,
+// commit 77d70693e1e3134dac312a303bffafa7d50fa988).
+//
+// Scope boundary: this framework records diagnostics in portable Karkain
+// arrays. It does not export to external systems, sample probabilistically
+// or measure wall-clock time.
+//
+// Telemetry representation: triples [kind, name, value, ...] where kind is
+// "log", "metric" or "span".
+
+// new_telemetry returns an empty diagnostics store.
+public func new_telemetry() {
+    return []
+}
+
+// log_event records a log entry at a level.
+public func log_event(telemetry, level, message) {
+    let out = telemetry
+    out = push(out, "log")
+    out = push(out, level)
+    out = push(out, message)
+    return out
+}
+
+// record_metric records a named numeric metric.
+public func record_metric(telemetry, name, value) {
+    let out = telemetry
+    out = push(out, "metric")
+    out = push(out, name)
+    out = push(out, value)
+    return out
+}
+
+// start_span records the start of a trace span.
+public func start_span(telemetry, name) {
+    let out = telemetry
+    out = push(out, "span")
+    out = push(out, name)
+    out = push(out, "start")
+    return out
+}
+
+// end_span records the end of a trace span.
+public func end_span(telemetry, name) {
+    let out = telemetry
+    out = push(out, "span")
+    out = push(out, name)
+    out = push(out, "end")
+    return out
+}
+
+// event_count returns the number of recorded entries.
+public func event_count(telemetry) {
+    return len(telemetry) / 3
+}
+
+// count_kind counts entries of a given kind.
+public func count_kind(telemetry, kind) {
+    let n = 0
+    let i = 0
+    while (i < len(telemetry)) {
+        if telemetry[i] == kind {
+            n = n + 1
+        }
+        i = i + 3
+    }
+    return n
+}
+
+// error_count counts log entries recorded at error level.
+public func error_count(telemetry) {
+    let n = 0
+    let i = 0
+    while (i < len(telemetry)) {
+        if telemetry[i] == "log" {
+            if telemetry[i + 1] == "error" {
+                n = n + 1
+            }
+        }
+        i = i + 3
+    }
+    return n
+}
+
+// last_value returns the most recent recorded value or "".
+public func last_value(telemetry) {
+    if len(telemetry) == 0 {
+        return ""
+    }
+    return str(telemetry[len(telemetry) - 1])
+}
+
+// summary builds a one-line diagnostics summary.
+public func summary(telemetry) {
+    return "logs=" + str(count_kind(telemetry, "log")) + " metrics=" + str(count_kind(telemetry, "metric")) + " spans=" + str(count_kind(telemetry, "span"))
+}

@@ -1,0 +1,56 @@
+// Native tests for Karkain-Observability.
+
+func sample_telemetry() {
+    let t = log_event(new_telemetry(), "info", "started")
+    t = log_event(t, "error", "failed")
+    t = record_metric(t, "requests", 5)
+    t = start_span(t, "work")
+    return end_span(t, "work")
+}
+
+func test_new_telemetry() {
+    assert_eq(event_count(new_telemetry()), 0)
+    assert_eq(summary(new_telemetry()), "logs=0 metrics=0 spans=0")
+}
+
+func test_log_event() {
+    let t = log_event(new_telemetry(), "warn", "careful")
+    assert_eq(event_count(t), 1)
+    assert_eq(count_kind(t, "log"), 1)
+    assert_eq(t[1], "warn")
+    assert_eq(t[2], "careful")
+}
+
+func test_record_metric() {
+    let t = record_metric(new_telemetry(), "hits", 7)
+    assert_eq(count_kind(t, "metric"), 1)
+    assert_eq(t[1], "hits")
+    assert_eq(t[2], 7)
+}
+
+func test_spans() {
+    let t = end_span(start_span(new_telemetry(), "job"), "job")
+    assert_eq(count_kind(t, "span"), 2)
+    assert_eq(t[2], "start")
+    assert_eq(t[5], "end")
+}
+
+func test_event_count() {
+    assert_eq(event_count(sample_telemetry()), 5)
+}
+
+func test_error_count() {
+    let t = sample_telemetry()
+    assert_eq(error_count(t), 1)
+    assert_eq(error_count(new_telemetry()), 0)
+    assert_eq(error_count(log_event(new_telemetry(), "info", "ok")), 0)
+}
+
+func test_last_value() {
+    assert_eq(last_value(sample_telemetry()), "end")
+    assert_eq(last_value(new_telemetry()), "")
+}
+
+func test_summary() {
+    assert_eq(summary(sample_telemetry()), "logs=2 metrics=1 spans=2")
+}

@@ -1,0 +1,15 @@
+// Karkain-Observability runnable example: logs, metrics and spans.
+import observability
+
+func main() {
+    let t = new_telemetry()
+    t = log_event(t, "info", "service started")
+    t = record_metric(t, "requests", 12)
+    t = log_event(t, "error", "downstream timeout")
+    t = start_span(t, "request-1")
+    t = end_span(t, "request-1")
+
+    println(summary(t))
+    println("errors=" + str(error_count(t)))
+    println("last=" + last_value(t))
+}

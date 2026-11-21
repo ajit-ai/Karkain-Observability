@@ -1,0 +1,15 @@
+// Integration verification for the Karkain-Observability public API.
+import observability
+
+func main() {
+    let t = new_telemetry()
+    t = log_event(t, "info", "boot")
+    t = record_metric(t, "jobs", 3)
+    t = start_span(t, "run")
+    t = end_span(t, "run")
+
+    assert_eq(event_count(t), 4)
+    assert_eq(error_count(t), 0)
+    println(summary(t))
+    println("last=" + last_value(t))
+}

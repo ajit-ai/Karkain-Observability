@@ -1,0 +1,7 @@
+name = "karkain-observability"
+version = "0.1.0-dev"
+description = "Logs, metrics and trace diagnostics for Karkain"
+license = "MIT"
+targets = ["native"]
+
+[dependencies]
