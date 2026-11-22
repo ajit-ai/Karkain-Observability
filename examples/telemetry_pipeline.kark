@@ -1,0 +1,19 @@
+// Karkain-Observability Phase 2 example: logs, metrics and spans.
+import observability
+
+func main() {
+    let logs = structured_log(new_logs(), "info", "started", "corr-1")
+    println("logs=" + str(log_count(logs)))
+
+    let metrics = define_metric(new_metric_registry(), "requests", "counter", 1)
+    let updated = increment_metric(metrics, "requests", 4)
+    println("requests=" + str(metric_value(updated, "requests")))
+
+    let spans = add_span(add_span(new_span_store(), "root", ""), "child", "root")
+    println("spans=" + str(span_count(spans)))
+    println("parent=" + span_parent(spans, "child"))
+
+    let exporter = new_exporter("test", "logs")
+    println("external=" + str(exporter_supports(exporter, "network")))
+    println("redacted=" + redact("secret-value"))
+}

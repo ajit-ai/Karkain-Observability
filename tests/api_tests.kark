@@ -54,3 +54,85 @@ func test_last_value() {
 func test_summary() {
     assert_eq(summary(sample_telemetry()), "logs=2 metrics=1 spans=2")
 }
+
+// --- Phase 2 regression ---
+
+func test_phase1_regression() {
+    let t = log_event(record_metric(new_telemetry(), "jobs", 3), "error", "failed")
+    assert_eq(count_kind(t, "log"), 1)
+    assert_eq(count_kind(t, "metric"), 1)
+    assert_eq(error_count(t), 1)
+    assert_eq(last_value(t), "failed")
+}
+
+// --- Phase 2 additions ---
+
+func test_log_levels_and_filtering() {
+    assert(valid_level("info"))
+    assert(valid_level("trace") == false)
+    let logs = structured_log(structured_log(new_logs(), "info", "a", "c1"), "error", "b", "c2")
+    assert_eq(log_count(logs), 2)
+    assert_eq(len(filtered_logs(logs, "error")), 1)
+    assert_eq(filtered_logs(logs, "error")[0], "b")
+    assert_eq(len(filtered_logs(new_logs(), "info")), 0)
+}
+
+func test_metrics_registry() {
+    let r = define_metric(define_metric(new_metric_registry(), "hits", "counter", 0), "temp", "gauge", 20)
+    assert_eq(metric_kind(r, "hits"), "counter")
+    assert_eq(metric_value(r, "temp"), 20)
+    assert_eq(metric_kind(r, "none"), "")
+    assert_eq(metric_value(r, "none"), 0)
+}
+
+func test_metric_updates() {
+    let r = define_metric(new_metric_registry(), "hits", "counter", 1)
+    let up = increment_metric(r, "hits", 4)
+    assert_eq(metric_value(up, "hits"), 5)
+    assert_eq(metric_value(r, "hits"), 1)
+    assert_eq(metric_value(set_metric(r, "hits", 9), "hits"), 9)
+}
+
+func test_trace_and_spans() {
+    let trace = new_trace("t1")
+    assert_eq(trace_id(trace), "t1")
+    let store = add_span(add_span(new_span_store(), "child", "root"), "root", "")
+    assert_eq(span_count(store), 2)
+    assert_eq(span_parent(store, "child"), "root")
+    assert_eq(span_status(store, "child"), "active")
+    assert_eq(span_status(finish_span(store, "child"), "child"), "complete")
+    assert_eq(span_status(store, "child"), "active")
+    assert_eq(span_status(store, "missing"), "missing")
+}
+
+func test_sampling_and_health() {
+    let p = new_sampling(5)
+    assert(should_sample(p, 5))
+    assert(should_sample(p, 6) == false)
+    assert(health_ready(new_health("api", "healthy", true)))
+    assert(health_ready(new_health("api", "healthy", false)) == false)
+}
+
+func test_exporters_and_config() {
+    let e = new_exporter("test", "logs,metrics")
+    assert(exporter_supports(e, "logs"))
+    assert(exporter_supports(e, "traces") == false)
+    assert_eq(export_contract(), "provider.export(batch)")
+    let cfg = config_set(config_set(new_pipeline_config("p"), "level", "info"), "sample", "5")
+    assert_eq(config_get(cfg, "level", ""), "info")
+    assert_eq(config_get(cfg, "none", "x"), "x")
+}
+
+func test_redaction_and_contracts() {
+    assert(is_sensitive("password_hash"))
+    assert(is_sensitive("access_token"))
+    assert(is_sensitive("username") == false)
+    assert_eq(redact("secret"), "***")
+    assert_eq(redact(""), "")
+    assert_eq(application_contract(), "observability.component(application,state)")
+    assert_eq(web_contract(), "observability.request(method,path,status)")
+    assert_eq(api_contract(), "observability.endpoint(name,status)")
+    assert_eq(jobs_contract(), "observability.job(id,status)")
+    assert_eq(event_contract(), "observability.event(kind,status)")
+    assert_eq(distributed_contract(), "observability.node(id,health)")
+}

@@ -34,7 +34,7 @@ try {
     $out = Invoke-Karkain @('test', $combined); $code = $LASTEXITCODE
     Write-Output "TEST native: exit=$code"; Write-Output $out
     if ($code -ne 0) { throw 'native tests failed' }
-    if ($out -notlike '*8 tests, 8 passed, 0 failed*') { throw 'native test summary mismatch' }
+    if ($out -notlike '*16 tests, 16 passed, 0 failed*') { throw 'native test summary mismatch' }
 
     $verify = Join-Path $repo 'src\verify.kark'
     $out = Invoke-Karkain @('run', $verify); $code = $LASTEXITCODE
@@ -54,6 +54,16 @@ try {
     $out = Invoke-Karkain @('run', (Join-Path $exDir 'service_diagnostics.kark')); $code = $LASTEXITCODE
     Write-Output "RUN example: exit=$code"; Write-Output $out
     if ($code -ne 0) { throw 'example failed' }    if ($out -notlike '*errors=1*') { throw 'example check missing' }
+    $advDir = Join-Path $tmp 'advanced'
+    New-Item -ItemType Directory -Path $advDir | Out-Null
+    Copy-Item -LiteralPath $module -Destination (Join-Path $advDir 'observability.kark')
+    Copy-Item -LiteralPath (Join-Path $repo 'examples\telemetry_pipeline.kark') -Destination (Join-Path $advDir 'telemetry_pipeline.kark')
+    $out = Invoke-Karkain @('run', (Join-Path $advDir 'telemetry_pipeline.kark')); $code = $LASTEXITCODE
+    Write-Output "RUN advanced example: exit=$code"; Write-Output $out
+    if ($code -ne 0) { throw 'advanced example failed' }
+    if ($out -notlike '*requests=5*') { throw 'advanced metric output missing' }
+    if ($out -notlike '*parent=root*') { throw 'advanced span output missing' }
+
     Write-Output 'VERIFY: ALL GATES PASSED'
 }
 finally {

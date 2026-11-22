@@ -95,3 +95,261 @@ public func last_value(telemetry) {
 public func summary(telemetry) {
     return "logs=" + str(count_kind(telemetry, "log")) + " metrics=" + str(count_kind(telemetry, "metric")) + " spans=" + str(count_kind(telemetry, "span"))
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 additions. Phase 1 telemetry API is unchanged. All telemetry below
+// is in-process; external exporters and collectors are interfaces only.
+
+// valid_level reports whether a log level is supported.
+public func valid_level(level) {
+    if level == "debug" { return true }
+    if level == "info" { return true }
+    if level == "warn" { return true }
+    if level == "error" { return true }
+    return false
+}
+
+// new_logs creates an empty structured log store.
+public func new_logs() {
+    return []
+}
+
+// structured_log appends a log record with correlation metadata.
+public func structured_log(logs, level, message, correlation) {
+    let out = logs
+    out = push(out, level)
+    out = push(out, message)
+    out = push(out, correlation)
+    return out
+}
+
+// log_count returns the number of structured log records.
+public func log_count(logs) { return len(logs) / 3 }
+
+// filtered_logs returns messages recorded at a level.
+public func filtered_logs(logs, level) {
+    let out = []
+    let i = 0
+    while (i < len(logs)) {
+        if logs[i] == level { out = push(out, logs[i + 1]) }
+        i = i + 3
+    }
+    return out
+}
+
+// new_metric_registry creates an empty metric registry.
+public func new_metric_registry() {
+    return []
+}
+
+// define_metric registers a named metric with kind and value.
+public func define_metric(registry, name, kind, value) {
+    let out = registry
+    out = push(out, name)
+    out = push(out, kind)
+    out = push(out, value)
+    return out
+}
+
+// metric_kind returns a metric kind or "".
+public func metric_kind(registry, name) {
+    let i = 0
+    while (i < len(registry)) {
+        if registry[i] == name { return registry[i + 1] }
+        i = i + 3
+    }
+    return ""
+}
+
+// metric_value returns a metric value or 0.
+public func metric_value(registry, name) {
+    let i = 0
+    while (i < len(registry)) {
+        if registry[i] == name { return registry[i + 2] }
+        i = i + 3
+    }
+    return 0
+}
+
+// set_metric updates a registered metric value.
+public func set_metric(registry, name, value) {
+    let out = []
+    let i = 0
+    while (i < len(registry)) {
+        if registry[i] == name {
+            out = push(out, registry[i])
+            out = push(out, registry[i + 1])
+            out = push(out, value)
+        } else {
+            out = push(out, registry[i])
+            out = push(out, registry[i + 1])
+            out = push(out, registry[i + 2])
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// increment_metric adds a delta to a registered metric.
+public func increment_metric(registry, name, delta) {
+    return set_metric(registry, name, metric_value(registry, name) + delta)
+}
+
+// new_trace creates a trace context.
+public func new_trace(id) {
+    let t = []
+    t = push(t, id)
+    return t
+}
+
+// trace_id returns a trace identifier.
+public func trace_id(trace) { return trace[0] }
+
+// new_span_store creates an empty span store.
+public func new_span_store() {
+    return []
+}
+
+// add_span records a span with a parent id.
+public func add_span(store, name, parent) {
+    let out = store
+    out = push(out, name)
+    out = push(out, parent)
+    out = push(out, "active")
+    return out
+}
+
+// span_parent returns a span parent or "".
+public func span_parent(store, name) {
+    let i = 0
+    while (i < len(store)) {
+        if store[i] == name { return store[i + 1] }
+        i = i + 3
+    }
+    return ""
+}
+
+// span_status returns a span status or "missing".
+public func span_status(store, name) {
+    let i = 0
+    while (i < len(store)) {
+        if store[i] == name { return store[i + 2] }
+        i = i + 3
+    }
+    return "missing"
+}
+
+// finish_span marks a span complete.
+public func finish_span(store, name) {
+    let out = []
+    let i = 0
+    while (i < len(store)) {
+        if store[i] == name {
+            out = push(out, store[i])
+            out = push(out, store[i + 1])
+            out = push(out, "complete")
+        } else {
+            out = push(out, store[i])
+            out = push(out, store[i + 1])
+            out = push(out, store[i + 2])
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// span_count returns the number of recorded spans.
+public func span_count(store) { return len(store) / 3 }
+
+// new_sampling creates a sampling policy.
+public func new_sampling(threshold) {
+    let s = []
+    s = push(s, threshold)
+    return s
+}
+
+// should_sample reports whether a value falls under the threshold.
+public func should_sample(policy, value) { return value <= policy[0] }
+
+// new_health creates health/readiness metadata.
+public func new_health(name, state, ready) {
+    let h = []
+    h = push(h, name)
+    h = push(h, state)
+    h = push(h, ready)
+    return h
+}
+
+// health_ready reports readiness.
+public func health_ready(health) { return health[2] }
+
+// new_exporter declares an exporter interface.
+public func new_exporter(name, capabilities) {
+    let e = []
+    e = push(e, name)
+    e = push(e, capabilities)
+    return e
+}
+
+// exporter_supports reports whether a capability is advertised.
+public func exporter_supports(exporter, capability) { return contains(exporter[1], capability) }
+
+// export_contract documents the missing exporter operation.
+public func export_contract() { return "provider.export(batch)" }
+
+// new_pipeline_config creates an observability pipeline configuration.
+public func new_pipeline_config(name) {
+    let c = []
+    c = push(c, name)
+    return c
+}
+
+// config_set records a configuration value.
+public func config_set(config, key, value) {
+    let out = config
+    out = push(out, key)
+    out = push(out, value)
+    return out
+}
+
+// config_get returns a configuration value or a fallback.
+public func config_get(config, key, fallback) {
+    let i = 1
+    while (i < len(config)) {
+        if config[i] == key { return config[i + 1] }
+        i = i + 2
+    }
+    return fallback
+}
+
+// is_sensitive reports whether a field name should be redacted.
+public func is_sensitive(field) {
+    if contains(field, "password") { return true }
+    if contains(field, "token") { return true }
+    if contains(field, "secret") { return true }
+    return false
+}
+
+// redact returns a mask for non-empty values.
+public func redact(value) {
+    if len(value) == 0 { return "" }
+    return "***"
+}
+
+// application_contract documents Application observability integration.
+public func application_contract() { return "observability.component(application,state)" }
+
+// web_contract documents Web request instrumentation.
+public func web_contract() { return "observability.request(method,path,status)" }
+
+// api_contract documents API instrumentation.
+public func api_contract() { return "observability.endpoint(name,status)" }
+
+// jobs_contract documents Jobs telemetry integration.
+public func jobs_contract() { return "observability.job(id,status)" }
+
+// event_contract documents Event telemetry integration.
+public func event_contract() { return "observability.event(kind,status)" }
+
+// distributed_contract documents Distributed telemetry integration.
+public func distributed_contract() { return "observability.node(id,health)" }
